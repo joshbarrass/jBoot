@@ -20,7 +20,7 @@ FAT:
     NT_FLAGS db 0
     SIGNATURE db 41
     VOLUME_ID dd 816439811
-    VOLUME_LABEL db 'NO NAME    '
+    VOLUME_LABEL db 'jBoot Disk '
     SYSTEM_ID db 'FAT12   '
 
 start:
@@ -68,9 +68,52 @@ start:
     mov ax, 7C0h
     mov ds, ax
 
+    ; Print floppy info
+    push 8
+    mov si, OEM_LABEL
+    call print_N_string
+    call new_line
+    push 11
+    mov si, VOLUME_LABEL
+    call print_N_string
+    call new_line
+
     ; Jump here indefinitely
     ; Will hang the system.
     jmp $
+
+; Function to print an N-byte string.
+; Push a char (number of bytes to print) to the
+; stack, and put a pointer to the string in SI.
+; This function will clean up the byte on the
+; stack. 
+print_N_string:
+    push bp
+    mov bp, sp
+
+    ; set to "print char"
+    mov ah, 0Eh
+
+.loop:
+    cmp byte [bp + 4], 0
+    je .done
+    lodsb
+    int 10h
+    sub byte [bp + 4], 1
+    jmp .loop
+
+.done:
+    pop bp
+    ret 1
+
+; subroutine to go to the next line and carriage return
+new_line:
+    ; carriage return
+    mov ax, 0e0dh
+    int 10h
+    mov ax, 0e0ah
+    int 10h
+    ret
 
 footer:
     times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s

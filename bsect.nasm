@@ -1,5 +1,28 @@
 BITS 16
 
+FAT:
+    jmp short start
+    nop
+    OEM_LABEL db 'MSWIN4.1'
+    BYTES_PER_SECTOR dw 512
+    SECTORS_PER_CLUSTER db 1
+    RESERVED_SECTORS dw 1
+    N_FATS db 2
+    N_ROOTS dw 224
+    N_SECTORS dw 2880
+    MDT db 240
+    SECTORS_PER_FAT dw 9
+    SECTORS_PER_TRACK dw 18
+    N_HEADS dw 2
+    N_HIDDEN_SECTORS dd 0
+    LARGE_SECTOR_COUNT dd 0
+    DRIVE_NUMBER db 0
+    NT_FLAGS db 0
+    SIGNATURE db 41
+    VOLUME_ID dd 816439811
+    VOLUME_LABEL db 'NO NAME    '
+    SYSTEM_ID db 'FAT12   '
+
 start:
     ; Need to set up some stack space somewhere safe
     ; ----------------------------------------------

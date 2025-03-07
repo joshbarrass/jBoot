@@ -1,6 +1,6 @@
 BITS 16
 
-FAT:
+FAT_header:
     jmp short start
     nop
     OEM_LABEL db 'MSWIN4.1'
@@ -10,7 +10,7 @@ FAT:
     N_FATS db 2
     N_ROOTS dw 224
     N_SECTORS dw 2880
-    MDT db 240
+    MDT db 0f0h
     SECTORS_PER_FAT dw 9
     SECTORS_PER_TRACK dw 18
     N_HEADS dw 2

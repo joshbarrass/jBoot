@@ -74,6 +74,23 @@ start:
         mov si, VOLUME_LABEL
         call print_N_string
 
+        ;; Load all FATs and the start of the root directory into the
+        ;; memory immediately after this bootloader
+        ;; TODO: full maths for loading the entire root directory
+        ;; root directory sectors = 32*(# root entries)/(bytes per sector)
+        xor dx, dx
+        xor ax, ax
+        mov al, [N_FATS]
+        mul word [SECTORS_PER_FAT]
+        inc al
+        mov cl, al
+        mov ax, 1
+        mov dl, [boot_drive]
+        mov bx, 7c0h
+        mov es, bx
+        mov bx, FAT
+        call load_sectors
+
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
 ;;; Function to print an N-byte string. Push a char (number of bytes
@@ -175,3 +192,5 @@ load_sectors:
 footer:
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature
+
+FAT:

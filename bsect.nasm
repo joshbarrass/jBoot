@@ -8,7 +8,7 @@ FAT_header:
         SECTORS_PER_CLUSTER db 1
         RESERVED_SECTORS dw 1
         N_FATS db 2
-        N_ROOTS dw 224
+        N_ROOT_DIR_ENTRIES dw 224
         N_SECTORS dw 2880
         MDT db 0f0h
         SECTORS_PER_FAT dw 9
@@ -54,6 +54,10 @@ start:
         mov sp, 7700h
         mov bp, sp
 
+        mov [boot_drive], dl    ; Store the boot drive number. The
+                                ; BIOS initially stores this in DL,
+                                ; but we might overwrite this.
+
         ;; Set DS to where the bootloader is loaded. This allows us
         ;; to access data in the bootloader "directly", via the offset
         ;; from the start of the bootloader known at assemble-time,
@@ -69,14 +73,12 @@ start:
         push 11
         mov si, VOLUME_LABEL
         call print_N_string
-        call new_line
 
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
-        ;; Function to print an N-byte string. Push a char (number of
-        ;; bytes to print) to the stack, and put a pointer to the
-        ;; string in SI. This function will clean up the byte on the
-        ;; stack.
+;;; Function to print an N-byte string. Push a char (number of bytes
+;;; to print) to the stack, and put a pointer to the string in
+;;; SI. This function will clean up the byte on the stack.
 print_N_string:
         push bp
         mov bp, sp
@@ -95,7 +97,7 @@ print_N_string:
         pop bp
         ret 1
 
-        ;; subroutine to go to the next line and carriage return
+;;; subroutine to go to the next line and carriage return
 new_line:
         mov ax, 0e0dh           ; carriage return
         int 10h
@@ -103,6 +105,71 @@ new_line:
         int 10h
         ret
 
+;;; Subroutine to load a number of sectors into memory. This is
+;;; a wrapper around int 13h to take the sector number as an
+;;; LBA value.
+;;; Args:
+;;;   - AX: sector number to read (LBA)
+;;;   - CL: number of sectors to read
+;;;   - DL: drive number
+;;;   - ES:BX: location to read data to
+;;; Clobbered registers:
+;;;   - CH
+;;;   - DH
+load_sectors:
+        ;; https://wiki.osdev.org/Disk_access_using_the_BIOS_(INT_13h)#The_Algorithm
+
+        ;; Because the sector number (LBA value) is already in ax, we
+        ;; can divide it directly.
+        ;; We want to use the DIV r/m16 instruction.
+        ;; This divides DX:AX by the operand, then stores the quotient
+        ;; in AX and the remainder in DX.
+        ;; Therefore we will clobber DL
+
+        ;; We'll store those args to some static variables to avoid
+        ;; losing them
+        mov [sector_count_storage], cl
+        mov [drive_number_storage], dl
+
+        xor dx, dx
+        div word [SECTORS_PER_TRACK]
+                                ; ax now contains Temp
+                                ; dx now contains LBA % (Sectors per Track)
+        ;; Now store the sector value in CL (and add 1, since sectors
+        ;; are addressed from 1).
+        mov cl, dl
+        inc cl
+
+        ;; now calculate head and cylinder
+        xor dx, dx
+        ;; ax already contains Temp
+        div word [N_HEADS]
+                                ; ax now contains the cylinder
+                                ; dx now contains the head
+        ;; store the head
+        mov dh, dl
+        ;; store the lower byte of the cylinder
+        mov ch, al
+        ;; extract the upper two bits of the cylinder
+        shr ax, 2
+        and al, 0C0h
+        ;; store the upper two bits of the cylinder
+        or cl, al
+
+        ;; all arithmetic is done; restore the drive number
+        mov dl, [drive_number_storage]
+
+        ;; set the necessary registers for int 13h
+        mov al, [sector_count_storage]    ; # sectors to read
+        mov ah, 02h
+
+        int 13h
+        ret
+        sector_count_storage db 0
+        drive_number_storage db 0
+
+
+        boot_drive db 0
 
 
 footer:

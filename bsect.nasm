@@ -90,12 +90,44 @@ start:
         div word [BYTES_PER_SECTOR]   ; Result is now in AX
         add cl, al                    ; Add to how many sectors are needed by the FATs
 
+        ;; We now know how many sectors are used by the FATs and the
+        ;; root directory entries. If we add 1 to this, this is the
+        ;; offset (in sectors) to the first data cluser (cluster 2).
+        ;;
+        ;; Simplified example: if the FATs and root dir use 3 sectors,
+        ;; then there are a total of 4 sectors in use before the first
+        ;; data cluster: the MBR (sector 0) + sectors 1, 2, and
+        ;; 3. Therefore, cluster 2 lies at sector 4.
+        ;;
+        ;; If we save this value now, we can reuse it when we come to
+        ;; load data from the filesystem.
+        mov [cluster_2_sector], cl
+        inc byte [cluster_2_sector]
+
         mov ax, 1                     ; Read from LBA 1
         mov dl, [boot_drive]
         mov bx, 7c0h                  ; Store at the end of the boot sector
         mov es, bx                    ;
         mov bx, FAT                   ;
         call load_sectors
+
+        ;; load a file somewhere random
+        mov bx, 0CC0h
+        mov es, bx
+        mov bx, 0
+        mov ax, 3
+        call load_file
+
+        mov bx, es
+        mov ds, bx
+        mov cx, 10
+        mov si, 0
+        call print_N_string
+        mov bx, 0CE0h
+        mov ds, bx
+        mov cx, 13
+        mov si, 0
+        call print_N_string
 
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
@@ -184,11 +216,89 @@ load_sectors:
         sector_count_storage db 0
         drive_number_storage db 0
 
+;;; Subroutine to load a file into memory by following the FAT chain.
+;;; Args:
+;;;   - AX: index of the first cluster (first cluster is cluster 2)
+;;;   - DL: drive number
+;;;   - ES:BX: location to read data to
+load_file:
+        push ax ; we need to keep track of which (logical) sector we're reading
+        ;; store how many sectors we need to read in the right
+        ;; register
+        xor cx, cx
+        mov cl, byte [SECTORS_PER_CLUSTER]
 
-        boot_drive db 0
+                                ; AX currently contains the cluster number
+        sub ax, 2               ; subtract 2...
+        mul cl                  ; multiply by the number of sectors per cluster...
+        add ax, [cluster_2_sector]    ; and add the sector offset to cluster 2
+        ;; AX now contains the starting sector of the target cluster
+        ;; CL contains the numbers of sectors to read
+        ;; DL still contains the drive number
+        ;; ES:BX still contains the location to read to
+        ;; Now we can load this sector.        
+        call load_sectors
 
+        ;; increment BX by one cluster's worth of bytes
+        push dx                  ; the 16-bit multiplication will clobber dx
+        mov ax, word [BYTES_PER_SECTOR]
+        mov cx, [SECTORS_PER_CLUSTER]
+        mul cx
+        pop dx                   ; restore dx
+        add bx, ax
+
+        ;; Now figure out where the next sector is by reading the FAT
+        pop ax
+        call read_FAT_for_cluster
+
+        ;; If it's not an EOF marker, read the next chunk
+        ;; AX contains the next cluster index
+        ;; DL is unchanged
+        ;; EX:BX has been incremented
+        cmp ax, 0FFFh
+        jne load_file
+        
+        .done:
+        ret
+
+;;; Subroutine to read the entry in the FAT corresponding to a cluster.
+;;; Args:
+;;;   - AX: index of the cluster, starting from 2
+;;; Return values:
+;;;   - AX: value in the FAT
+read_FAT_for_cluster:
+        push bx
+        
+        mov bx, ax              ; get bx = floor(AX * 1.5) so we can read the correct word
+        shr bx, 1               ;
+        add bx, ax              ; doing everything on bx avoids clobbering ax
+
+        mov bx, [bx+FAT]
+
+        ;; BX now contains the word corresponding to the FAT
+        ;; entry. For FAT12, this will contain the FAT entry we want +
+        ;; one nibble of the entry we don't want. Dependent on whether
+        ;; the current cluster is odd or even, we need to filter it in
+        ;; a different way. Since we haven't clobbered AX, if we just
+        ;; AND with 1, the zero flag will be set if the current
+        ;; cluster is even.
+        and ax, 1
+        jnz .is_odd
+        .is_even:
+        and bx, 0FFFh
+        jmp .done
+        .is_odd:
+        shr bx, 4
+        
+        .done:
+        mov ax, bx
+        pop bx
+        ret
 
 footer:
+        boot_drive db 0
+        cluster_2_sector db 0
+        
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature
 

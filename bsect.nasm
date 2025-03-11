@@ -66,11 +66,11 @@ start:
         mov ds, ax
 
         ;; Print floppy info
-        push 8
+        mov cx, 8
         mov si, OEM_LABEL
         call print_N_string
         call new_line
-        push 11
+        mov cx, 11
         mov si, VOLUME_LABEL
         call print_N_string
 
@@ -99,26 +99,19 @@ start:
 
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
-;;; Function to print an N-byte string. Push a char (number of bytes
-;;; to print) to the stack, and put a pointer to the string in
-;;; SI. This function will clean up the byte on the stack.
+;;; Subroutine to print an N-byte string. Put a number of bytes to
+;;; print in CX, and put a pointer to the string in SI. Expect bad
+;;; things to happen if you set CX = 0
 print_N_string:
-        push bp
-        mov bp, sp
-
         mov ah, 0Eh             ; set to "print char" mode
 
         .loop:
-        cmp byte [bp + 4], 0
-        je .done
         lodsb
         int 10h
-        sub byte [bp + 4], 1
-        jmp .loop
+        loop .loop
 
         .done:
-        pop bp
-        ret 1
+        ret
 
 ;;; subroutine to go to the next line and carriage return
 new_line:

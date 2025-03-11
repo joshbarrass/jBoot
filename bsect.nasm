@@ -76,19 +76,25 @@ start:
 
         ;; Load all FATs and the start of the root directory into the
         ;; memory immediately after this bootloader
-        ;; TODO: full maths for loading the entire root directory
+        xor dx, dx                    ; Zero DX and AX
+        xor ax, ax                    ;
+        mov al, [N_FATS]              ; Set the least significant byte of AX
+        mul word [SECTORS_PER_FAT]    ; Calculate how many sectors we need for all the FATs
+        mov cl, al                    ; Store the result
+
         ;; root directory sectors = 32*(# root entries)/(bytes per sector)
-        xor dx, dx
-        xor ax, ax
-        mov al, [N_FATS]
-        mul word [SECTORS_PER_FAT]
-        inc al
-        mov cl, al
-        mov ax, 1
+        xor dx, dx                    ; Zero DX and AX
+        xor ax, ax                    ;
+        mov al, 32                    ; Calculate number of sectors for the root directory
+        mul word [N_ROOT_DIR_ENTRIES] ;
+        div word [BYTES_PER_SECTOR]   ; Result is now in AX
+        add cl, al                    ; Add to how many sectors are needed by the FATs
+
+        mov ax, 1                     ; Read from LBA 1
         mov dl, [boot_drive]
-        mov bx, 7c0h
-        mov es, bx
-        mov bx, FAT
+        mov bx, 7c0h                  ; Store at the end of the boot sector
+        mov es, bx                    ;
+        mov bx, FAT                   ;
         call load_sectors
 
         jmp $                   ; Jump here indefinitely. Will hang the system.

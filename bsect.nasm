@@ -113,17 +113,18 @@ start:
 
         ;; load a file somewhere random
         mov bx, 0CC0h
+        push bx
         mov es, bx
         mov bx, 0
         mov ax, 2
         call load_file
-        mov ds, bx
+        pop ds
         xor ax, ax
         xor bx, bx
         xor cx, cx
         xor dx, dx
         mov es, bx
-        mov ds, bx
+        ;mov ds, bx
         mov dl, [boot_drive]
         jmp 0cc0h:0000h
 
@@ -242,8 +243,14 @@ load_file:
         mul cx
         pop dx                   ; restore dx
         add bx, ax
+        jnc .bx_ok
+        ;; if we made it here, bx overflowed, so we need to increase es as well
+        mov ax, es
+        add ax, 1000h
+        mov es, ax
 
         ;; Now figure out where the next sector is by reading the FAT
+        .bx_ok
         pop ax
         call read_FAT_for_cluster
 

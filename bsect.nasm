@@ -117,19 +117,15 @@ start:
         mov bx, 0
         mov ax, 2
         call load_file
-
-        mov bx, es
         mov ds, bx
-        mov cx, 10
-        mov si, 0
-        call print_N_string
-        mov bx, 0CE0h
+        xor ax, ax
+        xor bx, bx
+        xor cx, cx
+        xor dx, dx
+        mov es, bx
         mov ds, bx
-        mov cx, 13
-        mov si, 0
-        call print_N_string
-
-        jmp $                   ; Jump here indefinitely. Will hang the system.
+        mov dl, [boot_drive]
+        jmp 0cc0h:0000h
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
 ;;; print in CX, and put a pointer to the string in SI. Expect bad

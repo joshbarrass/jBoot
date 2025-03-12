@@ -5,6 +5,7 @@ boot.img: bsect.bin
 	rm -f boot.img
 	mkfs.msdos -F 12 -C boot.img 1440
 	dd if=bsect.bin of=boot.img conv=notrunc
+	mcopy -i boot.img ./misc/TEST.TXT ::TEST.TXT
 
 .PHONY: test
 test: boot.img

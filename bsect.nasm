@@ -115,7 +115,7 @@ start:
         mov bx, 0CC0h
         mov es, bx
         mov bx, 0
-        mov ax, 3
+        mov ax, 2
         call load_file
 
         mov bx, es

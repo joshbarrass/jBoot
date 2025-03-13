@@ -73,6 +73,11 @@ start:
         ;; mov cx, 11
         ;; mov si, VOLUME_LABEL
         ;; call print_N_string
+        call new_line
+        mov cx, 11
+        mov si, TARGET_FILE
+        call print_N_string
+        call new_line
 
         ;; Load all FATs and the start of the root directory into the
         ;; memory immediately after this bootloader
@@ -113,16 +118,20 @@ start:
         mov bx, FAT                   ;
         call load_sectors
 
-        ;; load a file somewhere random
+        ;; get the first cluster into AX
+        mov si, TARGET_FILE
+        call get_cluster_of_file
+        ;; AX now contains the cluster number
+
+        ;; set up the other args to load the file somewhere random
         mov bx, 0CC0h
         mov es, bx
         mov bx, 0
-        mov ax, 2
         call load_file
 
         mov bx, es
         mov ds, bx
-        mov cx, 10
+        mov cx, 13
         mov si, 0
         call print_N_string
         mov bx, 0CE0h
@@ -304,13 +313,76 @@ read_FAT_for_cluster:
         pop bx
         ret
 
+;;; Put an 11-byte filename string at SI. This function will return in
+;;; AX the number of the first cluster of this file by searching the
+;;; root directory entry.
+;;; Args:
+;;;  - SI: location of the filename string to compare against
+;;; Returns:
+;;;  - AX: index of the first cluster of the file
+;;; Clobbers:
+;;;  - CX
+;;;  - BX
+get_cluster_of_file:
+        push es
+
+        ;; set ES to the right segment
+        ;; should match DS
+        push ds
+        pop es
+
+        ;; find the root directory entry
+        ;; we want to get &FAT + SECTORS_PER_FAT*BYTES_PER_SECTOR*N_FATS
+        ;; that's where the root directory starts
+        push dx
+        xor ax, ax
+        mov al, byte [N_FATS]
+        mul word [BYTES_PER_SECTOR]
+        mul word [SECTORS_PER_FAT]
+        add ax, FAT
+        pop dx
+        ;; AX now contains the start of the root directory listing
+
+        ;; now we need to loop through the 32-byte entries until we
+        ;; find the one with the right filename
+        ;; DS should already be good as it's used everywhere else
+
+        ;; we'll backup the location of the string we're comparing
+        ;; with, and then store AX to DI. Then we can use CMPS to
+        ;; compare DS:SI against ES:DI
+        .loop:
+        push si
+        mov di, ax
+        ;; compare at most 11 characters
+        mov cx, 11
+        ;; then we can use REPZ CMPS to compare the strings, which
+        ;; will either compare CX characters or short-circuit the
+        ;; first time it encounters a non-matching character
+        ;; REPE is an alias for this (repeat while equal)
+        repe cmpsb
+        pop si
+        je .done
+        ;; if we got here, the strings don't match
+        ;; move to the next entry and repeat
+        add ax, 32
+        jmp .loop
+
+        .done:
+        ;; get the chunk number
+        add ax, 1Ah             ; 0x1A is the offset to the cluster number
+        mov bx, ax
+        mov ax, [bx]
+
+        pop es
+        ret
+
 footer:
         boot_drive db 0
         cluster_2_sector dw 0
 TARGET_FILE:
-        db 'OS'
+        db 'TEST2'
         times (TARGET_FILE+8)-$ db ' '
-        db 'BIN'
+        db 'TXT'
         
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

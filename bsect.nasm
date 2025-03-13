@@ -66,13 +66,13 @@ start:
         mov ds, ax
 
         ;; Print floppy info
-        mov cx, 8
-        mov si, OEM_LABEL
-        call print_N_string
-        call new_line
-        mov cx, 11
-        mov si, VOLUME_LABEL
-        call print_N_string
+        ;; mov cx, 8
+        ;; mov si, OEM_LABEL
+        ;; call print_N_string
+        ;; call new_line
+        ;; mov cx, 11
+        ;; mov si, VOLUME_LABEL
+        ;; call print_N_string
 
         ;; Load all FATs and the start of the root directory into the
         ;; memory immediately after this bootloader
@@ -134,8 +134,8 @@ start:
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
-;;; print in CX, and put a pointer to the string in SI. Expect bad
-;;; things to happen if you set CX = 0
+;;; print in CX, and put a pointer to the string in SI. CX = 0 is
+;;; equivalent to N = 256.
 print_N_string:
         mov ah, 0Eh             ; set to "print char" mode
 

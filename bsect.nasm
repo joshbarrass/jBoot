@@ -122,6 +122,9 @@ start:
         mov si, TARGET_FILE
         call get_cluster_of_file
         ;; AX now contains the cluster number
+        ;; if it's zero, then the file doesn't exist
+        or ax, ax
+        jz .err
 
         ;; set up the other args to load the file somewhere random
         mov bx, 0CC0h
@@ -139,7 +142,14 @@ start:
         mov cx, 13
         mov si, 0
         call print_N_string
+        jmp .hang
 
+        .err:
+        mov si, ERR_FNF
+        mov cx, 7
+        call print_N_string
+
+        .hang:
         jmp $                   ; Jump here indefinitely. Will hang the system.
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
@@ -350,22 +360,33 @@ get_cluster_of_file:
         ;; we'll backup the location of the string we're comparing
         ;; with, and then store AX to DI. Then we can use CMPS to
         ;; compare DS:SI against ES:DI
+        ;; test at most N_ROOT_DIR_ENTRIES before we give up
+        mov cx, [N_ROOT_DIR_ENTRIES]
         .loop:
         push si
         mov di, ax
         ;; compare at most 11 characters
+        push cx
         mov cx, 11
         ;; then we can use REPZ CMPS to compare the strings, which
         ;; will either compare CX characters or short-circuit the
         ;; first time it encounters a non-matching character
         ;; REPE is an alias for this (repeat while equal)
         repe cmpsb
+        pop cx
         pop si
         je .done
         ;; if we got here, the strings don't match
         ;; move to the next entry and repeat
         add ax, 32
-        jmp .loop
+        loop .loop
+        ;; If we made it here, it means we didn't use the jump to
+        ;; .done before we ran out of tries. This means the file does
+        ;; not exist!
+        ;; We can just return 0 if that's the case, since 0 is not a
+        ;; valid chunk number.
+        xor ax, ax
+        jmp .return
 
         .done:
         ;; get the chunk number
@@ -373,16 +394,18 @@ get_cluster_of_file:
         mov bx, ax
         mov ax, [bx]
 
+        .return:
         pop es
         ret
 
 footer:
         boot_drive db 0
         cluster_2_sector dw 0
-TARGET_FILE:
-        db 'TEST2'
+        TARGET_FILE db 'TEST2'
         times (TARGET_FILE+8)-$ db ' '
         db 'TXT'
+
+        ERR_FNF db 'MISSING'
         
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

@@ -246,8 +246,15 @@ load_file:
         mul cx
         pop dx                   ; restore dx
         add bx, ax
+        jnc .bx_ok               ; if carry flag is not set, all good
+        ;; if we made it here, bx overflowed, so we need to increase
+        ;; es by 1000h to avoid overwriting what's already been loaded
+        mov ax, es
+        add ah, 10h
+        mov es, ax
 
         ;; Now figure out where the next sector is by reading the FAT
+        .bx_ok:
         pop ax
         call read_FAT_for_cluster
 

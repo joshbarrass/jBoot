@@ -307,6 +307,10 @@ read_FAT_for_cluster:
 footer:
         boot_drive db 0
         cluster_2_sector dw 0
+TARGET_FILE:
+        db 'OS'
+        times (TARGET_FILE+8)-$ db ' '
+        db 'BIN'
         
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

@@ -101,8 +101,10 @@ start:
         ;;
         ;; If we save this value now, we can reuse it when we come to
         ;; load data from the filesystem.
+        ;; The variable is a word, but since it's little-endian we can
+        ;; do this for conciseness.
         mov [cluster_2_sector], cl
-        inc byte [cluster_2_sector]
+        inc word [cluster_2_sector]
 
         mov ax, 1                     ; Read from LBA 1
         mov dl, [boot_drive]
@@ -231,7 +233,7 @@ load_file:
                                 ; AX currently contains the cluster number
         sub ax, 2               ; subtract 2...
         mul cl                  ; multiply by the number of sectors per cluster...
-        add ax, [cluster_2_sector]    ; and add the sector offset to cluster 2
+        add ax, word [cluster_2_sector]    ; and add the sector offset to cluster 2
         ;; AX now contains the starting sector of the target cluster
         ;; CL contains the numbers of sectors to read
         ;; DL still contains the drive number
@@ -304,7 +306,7 @@ read_FAT_for_cluster:
 
 footer:
         boot_drive db 0
-        cluster_2_sector db 0
+        cluster_2_sector dw 0
         
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

@@ -4,7 +4,7 @@ A floppy disk FAT12 bootloader written in NASM assembly.
 
 --------------------------------------------------------
 
-## (Target) Memory Map
+## Memory Map
 
 | start      | end        | size      | description                  |
 |:----------:|:----------:|:---------:|:-----------------------------|

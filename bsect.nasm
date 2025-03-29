@@ -142,7 +142,9 @@ start:
         call print_N_string
 
         .hang:
-        jmp $                   ; Jump here indefinitely. Will hang the system.
+        cli
+        hlt
+        jmp .hang               ; Jump here indefinitely. Will hang the system.
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
 ;;; print in CX, and put a pointer to the string in SI. CX = 0 is

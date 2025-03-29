@@ -118,8 +118,9 @@ start:
         or ax, ax
         jz .err
 
-        ;; set up the other args to load the file somewhere random
-        mov bx, 0CC0h
+        ;; set up the other args to load the file just after the boot
+        ;; sector
+        mov bx, 07E0h
         mov es, bx
         mov bx, 0
         call load_file
@@ -129,7 +130,7 @@ start:
         mov cx, 13
         mov si, 0
         call print_N_string
-        mov bx, 0CE0h
+        mov bx, 0800h
         mov ds, bx
         mov cx, 13
         mov si, 0

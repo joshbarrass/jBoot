@@ -1,5 +1,5 @@
 bsect.bin: bsect.nasm
-	nasm -f bin -o bsect.bin bsect.nasm
+	nasm -f bin -o bsect.bin -l bsect.lst bsect.nasm
 
 boot.img: bsect.bin ./misc/TEST.TXT ./misc/TEST2.TXT
 	rm -f boot.img

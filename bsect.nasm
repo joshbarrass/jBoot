@@ -1,5 +1,13 @@
         BITS 16
 
+;;; We'll use the space from 0x7600 to 0x7BFF as working space for the
+;;; FAT and root directory listing.
+;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
+;;; 0x0500 to 0x7BFF should be free
+        FAT_SEGMENT equ 760h
+        FAT_OFFSET equ 0
+        ROOT_DIR_OFFSET equ 400h
+
 FAT_header:
         jmp short start
         nop
@@ -24,34 +32,22 @@ FAT_header:
         SYSTEM_ID db 'FAT12   '
 
 start:
-        ;; Need to set up some stack space somewhere safe
-        ;; -----------------------------------------------------------
-        ;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
-        ;; 0x0500 ­to 0x7BFF is should be free
-        ;; -----------------------------------------------------------
+        ;; Need to set up some stack space somewhere safe.
         ;; SS:SP defines the position of the stack. SP points to the
-        ;; top of the stack. (SS << 4) + SP is the physical location
-        ;; of the end top of the stack.
-        ;; -----------------------------------------------------------
-        ;; When something is placed on the stack, SP is decreased. In
-        ;; that way, the initial choice of SP decides how large the
-        ;; stack is (though SP can underflow from 0 to 0xfffe, so a
-        ;; stack overflow will launch SP somewhere else), while the
-        ;; choice of SS defines which section of RAM the stack uses.
-        ;; -----------------------------------------------------------
-        ;; If we set SS to 0x0050, this will put the lowest possible
-        ;; stack position (SP = 0) at 0x0500. When the stack is empty,
-        ;; we want the the stack pointer to be at 0x7C00 (since adding
-        ;; something to the stack pushes SP back, then adds it). So we
-        ;; initially want SP to be 0x7700. This gives a little under
-        ;; 30KiB of stack space.
+        ;; top of the stack.
+        ;;
+        ;; If we set SS = 0x0050, this will put the lowest possible
+        ;; stack position at 0x0500, which is safe. When the stack is
+        ;; empty, we want the the stack pointer to be at 0x7600 (since
+        ;; adding something to the stack pushes SP back, then sets the
+        ;; value). So want SP = 0x7100
         ;; -----------------------------------------------------------
         ;; Setting SS guarantees you one instruction with no
         ;; interrupts. Use this to safely set up the stack without the
-        ;; risk of an interrupt clobbering something.
+        ;; risk of an interrupt breaking something.
         mov ax, 50h
         mov ss, ax
-        mov sp, 7700h
+        mov sp, 7100h
         mov bp, sp
 
         mov [boot_drive], dl    ; Store the boot drive number. The
@@ -60,33 +56,32 @@ start:
 
         ;; Set DS to where the bootloader is loaded. This allows us
         ;; to access data in the bootloader "directly", via the offset
-        ;; from the start of the bootloader known at assemble-time,
-        ;; rather than having to calculate where to find some data.
+        ;; from the start of the bootloader.
         mov ax, 7C0h
         mov ds, ax
 
         ;; Print floppy info
-        ;; mov cx, 8
-        ;; mov si, OEM_LABEL
-        ;; call print_N_string
-        ;; call new_line
-        ;; mov cx, 11
-        ;; mov si, VOLUME_LABEL
-        ;; call print_N_string
         call new_line
         mov cx, 11
         mov si, TARGET_FILE
         call print_N_string
         call new_line
 
-        ;; Load all FATs and the start of the root directory into the
-        ;; memory immediately after this bootloader
+        ;; Calculate how many sectors are used by the FATs so we know
+        ;; which sector the root directory entry starts on
         xor dx, dx                    ; Zero DX and AX
         xor ax, ax                    ;
         mov al, [N_FATS]              ; Set the least significant byte of AX
         mul word [SECTORS_PER_FAT]    ; Calculate how many sectors we need for all the FATs
         mov cl, al                    ; Store the result
 
+        ;; Cache this value to quickly find the root directory entry
+        ;; The variable is a word, but since it's little-endian we can
+        ;; do this for conciseness.
+        mov [root_dir_sector], cl
+        inc word [root_dir_sector]
+
+        ;; Calculate which sector the first data sector starts on
         ;; root directory sectors = 32*(# root entries)/(bytes per sector)
         xor dx, dx                    ; Zero DX and AX
         xor ax, ax                    ;
@@ -95,30 +90,27 @@ start:
         div word [BYTES_PER_SECTOR]   ; Result is now in AX
         add cl, al                    ; Add to how many sectors are needed by the FATs
 
-        ;; We now know how many sectors are used by the FATs and the
-        ;; root directory entries. If we add 1 to this, this is the
-        ;; offset (in sectors) to the first data cluser (cluster 2).
-        ;;
-        ;; Simplified example: if the FATs and root dir use 3 sectors,
-        ;; then there are a total of 4 sectors in use before the first
-        ;; data cluster: the MBR (sector 0) + sectors 1, 2, and
-        ;; 3. Therefore, cluster 2 lies at sector 4.
-        ;;
-        ;; If we save this value now, we can reuse it when we come to
-        ;; load data from the filesystem.
-        ;; The variable is a word, but since it's little-endian we can
-        ;; do this for conciseness.
+        ;; Save this to aid loading data later
         mov [cluster_2_sector], cl
         inc word [cluster_2_sector]
 
+        ;; Load the first two sectors of the FAT to our reserved area
         mov ax, 1                     ; Read from LBA 1
         mov dl, [boot_drive]
-        mov bx, 7c0h                  ; Store at the end of the boot sector
+        mov bx, FAT_SEGMENT           ; Store just before the boot sector
         mov es, bx                    ;
-        mov bx, FAT                   ;
+        mov bx, FAT_OFFSET            ;
+        mov cl, 2                     ; Read two sectors
         call load_sectors
 
-        ;; get the first cluster into AX
+        ;; Load the first sector of the root directory listing to our
+        ;; reserved area
+        mov ax, [root_dir_sector]     ; Get the root directory sector
+        mov bx, ROOT_DIR_OFFSET       ;
+        mov cl, 1                     ; Read one sector
+        call load_sectors
+
+        ;; Find the first cluster of the file
         mov si, TARGET_FILE
         call get_cluster_of_file
         ;; AX now contains the cluster number
@@ -301,7 +293,11 @@ read_FAT_for_cluster:
         shr bx, 1               ;
         add bx, ax              ; doing everything on bx avoids clobbering ax
 
-        mov bx, [bx+FAT]
+        push ds                 ; We need to set the data segment to do (ds:)bx properly
+        push word FAT_SEGMENT   ;
+        pop ds                  ;
+        mov bx, [bx]
+        pop ds                  ; Restore the old DS
 
         ;; BX now contains the word corresponding to the FAT
         ;; entry. For FAT12, this will contain the FAT entry we want +
@@ -336,32 +332,26 @@ read_FAT_for_cluster:
 get_cluster_of_file:
         push es
 
-        ;; set ES to the right segment
-        ;; should match DS
-        push ds
+        ;; Set the segment.
+        ;; ES needs to point us to the right segment for the root
+        ;; directory entry.
+        ;; DS stays as it is as we're comparing DS:SI against ES:DI
+        push word FAT_SEGMENT
         pop es
 
-        ;; find the root directory entry
-        ;; we want to get &FAT + SECTORS_PER_FAT*BYTES_PER_SECTOR*N_FATS
-        ;; that's where the root directory starts
-        push dx
-        xor ax, ax
-        mov al, byte [N_FATS]
-        mul word [BYTES_PER_SECTOR]
-        mul word [SECTORS_PER_FAT]
-        add ax, FAT
-        pop dx
+        ;; point to the root directory entry in the working space
+        mov ax, ROOT_DIR_OFFSET
         ;; AX now contains the start of the root directory listing
 
         ;; now we need to loop through the 32-byte entries until we
         ;; find the one with the right filename
-        ;; DS should already be good as it's used everywhere else
 
         ;; we'll backup the location of the string we're comparing
         ;; with, and then store AX to DI. Then we can use CMPS to
         ;; compare DS:SI against ES:DI
-        ;; test at most N_ROOT_DIR_ENTRIES before we give up
-        mov cx, [N_ROOT_DIR_ENTRIES]
+        ;; test at most 14 entries before we give up
+        ;; TODO: this is only the first sector of the root dir entry
+        mov cx, 14
         .loop:
         push si
         mov di, ax
@@ -392,7 +382,10 @@ get_cluster_of_file:
         ;; get the chunk number
         add ax, 1Ah             ; 0x1A is the offset to the cluster number
         mov bx, ax
-        mov ax, [bx]
+        mov ax, [es:bx]         ; Override the segment.
+                                ; Our offset is to a location in the
+                                ; root directory listing segment,
+                                ; which we've been using ES for.
 
         .return:
         pop es
@@ -400,6 +393,7 @@ get_cluster_of_file:
 
 footer:
         boot_drive db 0
+        root_dir_sector dw 0
         cluster_2_sector dw 0
         TARGET_FILE db 'TEST2'
         times (TARGET_FILE+8)-$ db ' '
@@ -409,5 +403,3 @@ footer:
         
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature
-
-FAT:

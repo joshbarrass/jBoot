@@ -100,10 +100,8 @@ start:
 
         ;; Load the first sector of the root directory listing to our
         ;; reserved area
-        mov ax, [root_dir_sector]     ; Get the root directory sector
-        mov bx, ROOT_DIR_OFFSET       ;
-        mov cl, 1                     ; Read one sector
-        call load_sectors
+        mov ax, 0
+        call load_root_dir_chunk
 
         ;; Find the first cluster of the file
         mov si, TARGET_FILE
@@ -164,12 +162,29 @@ new_line:
         int 10h
         ret
 
+;;; subroutine to load a single 512-byte chunk of the root directory
+;;; entry (14 entries) into the root directory workspace.
+;;; Args:
+;;; - AX: which sector of the entry to load (0 = first sector)
+;;; Clobbers:
+;;; - AX
+;;; - BX
+;;; - CX
+;;; - DX
+;;; - ES
+load_root_dir_chunk:
+        add ax, word [root_dir_sector]; Get the root directory sector
+        mov bx, ROOT_DIR_OFFSET       ;
+        mov cl, 1                     ; Read one sector
+        jmp load_FAT_chunk.all_loads
+
 ;;; subroutine to load a single 1024-byte chunk of the FAT into the
 ;;; FAT workspace.
 ;;; Args:
 ;;; - AX: which sector of the FAT to load (0 = first sector of the
 ;;;       FAT)
 ;;; Clobbers:
+;;; - AX
 ;;; - BX
 ;;; - CX
 ;;; - DX

@@ -176,12 +176,17 @@ new_line:
 ;;; - ES
 load_FAT_chunk:
         ;; set up for load_sector
+        .FAT_specific_loads:
         inc ax                        ; FAT starts at index 1, so add 1
-        mov dl, [boot_drive]
-        mov bx, FAT_SEGMENT           ; Store just before the boot sector
-        mov es, bx                    ;
         mov bx, FAT_OFFSET            ;
         mov cl, 2                     ; Read two sectors
+
+        ;; configure parameters that stay the same for both the FAT
+        ;; and root directory entry loads
+        .all_loads:
+        push word FAT_SEGMENT         ; Store just before the boot sector
+        pop es                        ;
+        mov dl, [boot_drive]
 
         ;; Because of where we've placed the routine, the call is
         ;; implicit. We can save a few bytes here.

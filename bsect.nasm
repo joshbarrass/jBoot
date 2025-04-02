@@ -95,13 +95,8 @@ start:
         inc word [cluster_2_sector]
 
         ;; Load the first two sectors of the FAT to our reserved area
-        mov ax, 1                     ; Read from LBA 1
-        mov dl, [boot_drive]
-        mov bx, FAT_SEGMENT           ; Store just before the boot sector
-        mov es, bx                    ;
-        mov bx, FAT_OFFSET            ;
-        mov cl, 2                     ; Read two sectors
-        call load_sectors
+        mov ax, 0                     ; Read first sector of the FAT
+        call load_FAT_chunk
 
         ;; Load the first sector of the root directory listing to our
         ;; reserved area
@@ -168,6 +163,29 @@ new_line:
         mov al, 0ah             ; new line
         int 10h
         ret
+
+;;; subroutine to load a single 1024-byte chunk of the FAT into the
+;;; FAT workspace.
+;;; Args:
+;;; - AX: which sector of the FAT to load (0 = first sector of the
+;;;       FAT)
+;;; Clobbers:
+;;; - BX
+;;; - CX
+;;; - DX
+;;; - ES
+load_FAT_chunk:
+        ;; set up for load_sector
+        inc ax                        ; FAT starts at index 1, so add 1
+        mov dl, [boot_drive]
+        mov bx, FAT_SEGMENT           ; Store just before the boot sector
+        mov es, bx                    ;
+        mov bx, FAT_OFFSET            ;
+        mov cl, 2                     ; Read two sectors
+
+        ;; Because of where we've placed the routine, the call is
+        ;; implicit. We can save a few bytes here.
+        ;; call load_sectors
 
 ;;; Subroutine to load a number of sectors into memory. This is
 ;;; a wrapper around int 13h to take the sector number as an

@@ -329,10 +329,32 @@ load_file:
 ;;;   - AX: value in the FAT
 read_FAT_for_cluster:
         push bx
+        push ax                 ; we will restore this later to test the parity
         
-        mov bx, ax              ; get bx = floor(AX * 1.5) so we can read the correct word
+        mov bx, ax              ; get ax = floor(AX * 1.5) so we can read the correct word
         shr bx, 1               ;
-        add bx, ax              ; doing everything on bx avoids clobbering ax
+        add ax, bx              ;
+        ;; ax now contains the offset into the FAT for the cluster we care about
+
+        ;; now need to get the sector number and relative offset
+        ;; just divide by the sector size
+        ;; quotient is the sector number
+        ;; remainder is the offset into that sector
+        push dx                 ; clear DX so we can divide just AX
+        xor dx, dx
+        div word [BYTES_PER_SECTOR]
+        ;; AX now contains sector number
+        ;; DX now contains offset
+        ;; load the necessary FAT chunk (it's already in AX)
+        pusha
+        push es
+        call load_FAT_chunk
+        pop es
+        popa
+
+        mov bx, dx              ; store offset in BX so we can access the data directly
+        pop dx
+        pop ax                  ; restore AX from earlier for the comparison we need
 
         push ds                 ; We need to set the data segment to do (ds:)bx properly
         push word FAT_SEGMENT   ;

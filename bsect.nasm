@@ -411,14 +411,13 @@ get_cluster_of_file:
 
         ;; calculate how many sectors are used by the root directory
         ;; entries.
-        push dx
-        xor dx, dx
-        mov ax, 32              ; 32 bytes per entry
-        mul word [N_ROOT_DIR_ENTRIES]
-        div word [BYTES_PER_SECTOR]
-        ;; AX contains the number of sectors per root directory
-        pop dx
-        mov cx, ax              ; use this as a loop counter
+
+        ;; since we already know the first sector of the root
+        ;; directory entry and the first sector of the data clusters,
+        ;; we can subtract one from the other to find the root
+        ;; directory length without recalculating anything in full
+        mov cx, [cluster_2_sector]    ; use this as a loop counter
+        sub cx, [root_dir_sector]
 
         .chunk_load_loop:
         ;; load the directory chunk

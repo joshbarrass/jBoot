@@ -170,7 +170,7 @@ new_line:
 load_root_dir_chunk:
         add ax, word [root_dir_sector]; Get the root directory sector
         mov bx, ROOT_DIR_OFFSET       ;
-        mov cl, 1                     ; Read one sector
+        mov cx, 1                     ; Read one sector
         jmp load_FAT_chunk.all_loads
 
 ;;; subroutine to load a single 1024-byte chunk of the FAT into the
@@ -190,7 +190,7 @@ load_FAT_chunk:
         mov [loaded_FAT_chunk], ax
         inc ax                        ; FAT starts at index 1, so add 1
         mov bx, FAT_OFFSET            ;
-        mov cl, 2                     ; Read two sectors
+        mov cx, 2                     ; Read two sectors
 
         ;; configure parameters that stay the same for both the FAT
         ;; and root directory entry loads
@@ -203,18 +203,22 @@ load_FAT_chunk:
         ;; implicit. We can save a few bytes here.
         ;; call load_sectors
 
-;;; Subroutine to load a number of sectors into memory. This is
-;;; a wrapper around int 13h to take the sector number as an
-;;; LBA value.
+;;; Subroutine to load a number of sectors into memory. This is a
+;;; wrapper around int 13h to take the sector number as an LBA
+;;; value. ES:BX is incremented automatically by the number of bytes
+;;; read, so sequential sector loads will occupy contiguous memory.
 ;;; Args:
 ;;;   - AX: sector number to read (LBA)
-;;;   - CL: number of sectors to read
+;;;   - CX: number of sectors to read
 ;;;   - DL: drive number
 ;;;   - ES:BX: location to read data to
+;;; Returns:
+;;;   - ES:BX: end of data
 ;;; Clobbered registers:
-;;;   - CH
+;;;   - CX
 ;;;   - DH
 load_sectors:
+        enter 3, 0
         ;; https://wiki.osdev.org/Disk_access_using_the_BIOS_(INT_13h)#The_Algorithm
 
         ;; Because the sector number (LBA value) is already in ax, we
@@ -226,9 +230,12 @@ load_sectors:
 
         ;; We'll store those args to some static variables to avoid
         ;; losing them
-        mov [sector_count_storage], cl
-        mov [drive_number_storage], dl
+        mov [bp], ax
+        mov [bp-2], dl
 
+        .loop:
+        push cx
+        mov ax, [bp]
         xor dx, dx
         div word [SECTORS_PER_TRACK]
                                 ; ax now contains Temp
@@ -255,16 +262,28 @@ load_sectors:
         or cl, al
 
         ;; all arithmetic is done; restore the drive number
-        mov dl, [drive_number_storage]
+        mov dl, [bp-2]
 
         ;; set the necessary registers for int 13h
-        mov al, [sector_count_storage]    ; # sectors to read
-        mov ah, 02h
-
+        mov ax, 0x0201
         int 13h
+
+        ;; increment BX by one sector's worth of bytes
+        mov ax, word [BYTES_PER_SECTOR]
+        add bx, ax
+        jnc .bx_ok              ; if carry flag is not set, all good
+        ;; if we made it here, bx overflowed, so we need to increase
+        ;; es by 1000h to avoid overwriting what's already been loaded
+        mov ax, es
+        add ah, 10h
+        mov es, ax
+        .bx_ok:
+        inc word [bp] ; increment the sector to read
+        pop cx
+        loop .loop
+
+        leave
         ret
-        sector_count_storage db 0
-        drive_number_storage db 0
 
 ;;; Subroutine to load a file into memory by following the FAT chain.
 ;;; Args:
@@ -288,20 +307,8 @@ load_file:
         ;; ES:BX still contains the location to read to
         ;; Now we can load this sector.        
         call load_sectors
-
-        ;; increment BX by one cluster's worth of bytes
-        push dx                  ; the 16-bit multiplication will clobber dx
-        mov ax, word [BYTES_PER_SECTOR]
-        mov cx, [SECTORS_PER_CLUSTER]
-        mul cx
-        pop dx                   ; restore dx
-        add bx, ax
-        jnc .bx_ok               ; if carry flag is not set, all good
-        ;; if we made it here, bx overflowed, so we need to increase
-        ;; es by 1000h to avoid overwriting what's already been loaded
-        mov ax, es
-        add ah, 10h
-        mov es, ax
+        ;; load_sectors handles incrementing ES:BX by one cluster's
+        ;; worth of bytes
 
         ;; Now figure out where the next sector is by reading the FAT
         .bx_ok:

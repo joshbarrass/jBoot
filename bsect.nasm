@@ -475,9 +475,9 @@ get_cluster_of_file:
         pop cx                  ; this is the extra loop counter
                                 ; if we don't remove this, the ret will
                                 ; fail!
-        add ax, 1Ah             ; 0x1A is the offset to the cluster number
         mov bx, ax
-        mov ax, [es:bx]         ; Override the segment.
+        mov ax, [es:bx+1Ah]     ; Override the segment.
+                                ; 0x1A is the offset to the cluster number.
                                 ; Our offset is to a location in the
                                 ; root directory listing segment,
                                 ; which we've been using ES for.

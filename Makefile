@@ -1,5 +1,6 @@
 bsect.bin: bsect.nasm
 	nasm -f bin -o bsect.bin -l bsect.lst bsect.nasm
+	./tools/count_free_space.sh bsect.bin
 
 boot.img: bsect.bin ./misc/TEST.TXT ./misc/TEST2.TXT
 	rm -f boot.img

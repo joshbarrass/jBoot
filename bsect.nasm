@@ -61,11 +61,11 @@ start:
         mov ds, ax
 
         ;; Print floppy info
-        call new_line
-        mov cx, 11
-        mov si, TARGET_FILE
-        call print_N_string
-        call new_line
+        ;; call new_line
+        ;; mov cx, 11
+        ;; mov si, TARGET_FILE
+        ;; call print_N_string
+        ;; call new_line
 
         ;; Calculate how many sectors are used by the FATs so we know
         ;; which sector the root directory entry starts on
@@ -411,19 +411,39 @@ get_cluster_of_file:
         push word FAT_SEGMENT
         pop es
 
+        ;; now we need to loop through the 32-byte entries until we
+        ;; find the one with the right filename
+
+        ;; calculate how many sectors are used by the root directory
+        ;; entries.
+        push dx
+        xor dx, dx
+        mov ax, 32              ; 32 bytes per entry
+        mul word [N_ROOT_DIR_ENTRIES]
+        div word [BYTES_PER_SECTOR]
+        ;; AX contains the number of sectors per root directory
+        pop dx
+        mov cx, ax              ; use this as a loop counter
+
+        .chunk_load_loop:
+        ;; load the directory chunk
+        pusha
+        mov ax, cx
+        dec ax
+        call load_root_dir_chunk
+        popa
+
         ;; point to the root directory entry in the working space
         mov ax, ROOT_DIR_OFFSET
         ;; AX now contains the start of the root directory listing
 
-        ;; now we need to loop through the 32-byte entries until we
-        ;; find the one with the right filename
-
         ;; we'll backup the location of the string we're comparing
         ;; with, and then store AX to DI. Then we can use CMPS to
         ;; compare DS:SI against ES:DI
-        ;; test at most 14 entries before we give up
-        ;; TODO: this is only the first sector of the root dir entry
-        mov cx, 14
+        ;; test at most 16 entries before we load the next root dir
+        ;; chunk
+        push cx
+        mov cx, 16
         .loop:
         push si
         mov di, ax
@@ -442,6 +462,12 @@ get_cluster_of_file:
         ;; move to the next entry and repeat
         add ax, 32
         loop .loop
+
+        ;; didn't find it in this batch of 14
+        ;; go to the start of the outer loop and load the next chunk
+        pop cx
+        loop .chunk_load_loop
+
         ;; If we made it here, it means we didn't use the jump to
         ;; .done before we ran out of tries. This means the file does
         ;; not exist!
@@ -452,6 +478,9 @@ get_cluster_of_file:
 
         .done:
         ;; get the chunk number
+        pop cx                  ; this is the extra loop counter
+                                ; if we don't remove this, the ret will
+                                ; fail!
         add ax, 1Ah             ; 0x1A is the offset to the cluster number
         mov bx, ax
         mov ax, [es:bx]         ; Override the segment.

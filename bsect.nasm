@@ -57,8 +57,8 @@ start:
         ;; Set DS to where the bootloader is loaded. This allows us
         ;; to access data in the bootloader "directly", via the offset
         ;; from the start of the bootloader.
-        mov ax, 7C0h
-        mov ds, ax
+        push word 7C0h
+        pop ds
 
         ;; Print floppy info
         ;; call new_line
@@ -83,9 +83,8 @@ start:
 
         ;; Calculate which sector the first data sector starts on
         ;; root directory sectors = 32*(# root entries)/(bytes per sector)
-        xor dx, dx                    ; Zero DX and AX
-        xor ax, ax                    ;
-        mov al, 32                    ; Calculate number of sectors for the root directory
+        xor dx, dx                    ; Zero DX
+        mov ax, 32                    ; Calculate number of sectors for the root directory
         mul word [N_ROOT_DIR_ENTRIES] ;
         div word [BYTES_PER_SECTOR]   ; Result is now in AX
         add cl, al                    ; Add to how many sectors are needed by the FATs
@@ -94,14 +93,8 @@ start:
         mov [cluster_2_sector], cl
         inc word [cluster_2_sector]
 
-        ;; Load the first two sectors of the FAT to our reserved area
-        mov ax, 0                     ; Read first sector of the FAT
-        call load_FAT_chunk
-
-        ;; Load the first sector of the root directory listing to our
-        ;; reserved area
-        mov ax, 0
-        call load_root_dir_chunk
+        ;; No longer need to pre-load the FAT/root dir
+        ;; These will be loaded automatically
 
         ;; Find the first cluster of the file
         mov si, TARGET_FILE
@@ -113,20 +106,22 @@ start:
 
         ;; set up the other args to load the file just after the boot
         ;; sector
-        mov bx, 07E0h
-        mov es, bx
-        mov bx, 0
+        ;; mov bx, 07E0h
+        ;; mov es, bx
+        push word 07E0h
+        pop es
+        xor bx, bx
         call load_file
 
-        mov bx, es
-        mov ds, bx
+        push es
+        pop ds
         mov cx, 13
-        mov si, 0
+        xor si, si
         call print_N_string
-        mov bx, 0800h
-        mov ds, bx
+        push word 0800h
+        pop ds
         mov cx, 13
-        mov si, 0
+        xor si, si
         call print_N_string
         jmp .hang
 
@@ -502,6 +497,7 @@ footer:
         db 'TXT'
 
         ERR_FNF db 'MISSING'
-        
+
+        FREE_SPACE equ $-$$
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

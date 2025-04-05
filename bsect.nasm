@@ -192,6 +192,7 @@ load_root_dir_chunk:
 load_FAT_chunk:
         ;; set up for load_sector
         .FAT_specific_loads:
+        mov [loaded_FAT_chunk], ax
         inc ax                        ; FAT starts at index 1, so add 1
         mov bx, FAT_OFFSET            ;
         mov cl, 2                     ; Read two sectors
@@ -345,6 +346,13 @@ read_FAT_for_cluster:
         div word [BYTES_PER_SECTOR]
         ;; AX now contains sector number
         ;; DX now contains offset
+
+        ;; don't reload the FAT chunk if the sector number hasn't
+        ;; changed since last time
+        cmp ax, [loaded_FAT_chunk]
+        je .read_FAT
+
+        .reload_chunk:
         ;; load the necessary FAT chunk (it's already in AX)
         pusha
         push es
@@ -352,6 +360,7 @@ read_FAT_for_cluster:
         pop es
         popa
 
+        .read_FAT:
         mov bx, dx              ; store offset in BX so we can access the data directly
         pop dx
         pop ax                  ; restore AX from earlier for the comparison we need
@@ -458,6 +467,7 @@ footer:
         boot_drive db 0
         root_dir_sector dw 0
         cluster_2_sector dw 0
+        loaded_FAT_chunk dw 0xFFFF
         TARGET_FILE db 'TEST2'
         times (TARGET_FILE+8)-$ db ' '
         db 'TXT'

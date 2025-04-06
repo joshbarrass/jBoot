@@ -34,6 +34,21 @@ FAT_header:
         SYSTEM_ID db 'FAT12   '
 
 start:
+        ;; By pure bad luck, the perfect storm arises in this
+        ;; bootloader to convince the Linux kernel that this partition
+        ;; is something else. If you mount it with mount -t vfat, this
+        ;; isn't an issue, but if you want to mount the image with
+        ;; udisksctl, you'll have nothing but trouble. Adding this NOP
+        ;; is enough to disrupt that and allow Linux to automatically
+        ;; detect it as a FAT12 superfloppy.
+        ;;
+        ;; This doesn't affect tools that specifically work with FAT
+        ;; filesystems, such as mcopy, so scripted modifications of
+        ;; the filesystem will generally be fine, but it's nice to
+        ;; ensure compatibility with udisksctl for easy management of
+        ;; files on the filesystem.
+        nop
+
         ;; Need to set up some stack space somewhere safe.
         ;; SS:SP defines the position of the stack. SP points to the
         ;; top of the stack.

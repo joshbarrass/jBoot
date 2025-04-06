@@ -4,9 +4,11 @@
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
 ;;; 0x0500 to 0x7BFF should be free
-        FAT_SEGMENT equ 760h
+        FAT_SEGMENT equ 50h
         FAT_OFFSET equ 0
         ROOT_DIR_OFFSET equ 400h
+
+        RELOCATION_SEGMENT equ 0xB0
 
 FAT_header:
         jmp short start
@@ -36,28 +38,38 @@ start:
         ;; SS:SP defines the position of the stack. SP points to the
         ;; top of the stack.
         ;;
-        ;; If we set SS = 0x0050, this will put the lowest possible
-        ;; stack position at 0x0500, which is safe. When the stack is
-        ;; empty, we want the the stack pointer to be at 0x7600 (since
-        ;; adding something to the stack pushes SP back, then sets the
-        ;; value). So want SP = 0x7100
-        ;; -----------------------------------------------------------
         ;; Setting SS guarantees you one instruction with no
         ;; interrupts. Use this to safely set up the stack without the
         ;; risk of an interrupt breaking something.
-        mov ax, 50h
+        mov ax, 0xD0
         mov ss, ax
-        mov sp, 7100h
+        mov sp, 6f00h
         mov bp, sp
 
         mov [boot_drive], dl    ; Store the boot drive number. The
                                 ; BIOS initially stores this in DL,
                                 ; but we might overwrite this.
 
-        ;; Set DS to where the bootloader is loaded. This allows us
-        ;; to access data in the bootloader "directly", via the offset
-        ;; from the start of the bootloader.
+        ;; Set DS to where the bootloader is currently loaded
         push word 7C0h
+        pop ds
+
+        ;; copy this sector to the target location
+        ;; we will read 255 words (510 bytes), which is exactly enough
+        ;; to relocate all code, since the BIOS boot signature is 2
+        ;; bytes
+        xor si, si
+        xor di, di
+        push word RELOCATION_SEGMENT
+        pop es
+        mov cx, 255
+        .relocation_loop:
+        movsw
+        loop .relocation_loop
+        jmp RELOCATION_SEGMENT:(.after_relocation)
+
+        .after_relocation:
+        push word RELOCATION_SEGMENT
         pop ds
 
         ;; Print floppy info
@@ -106,19 +118,17 @@ start:
 
         ;; set up the other args to load the file just after the boot
         ;; sector
-        ;; mov bx, 07E0h
-        ;; mov es, bx
-        push word 07E0h
+        push word 07c0h
         pop es
         xor bx, bx
         call load_file
 
-        push es
+        push 07c0h
         pop ds
         mov cx, 13
         xor si, si
         call print_N_string
-        push word 0800h
+        push word 07e0h
         pop ds
         mov cx, 13
         xor si, si

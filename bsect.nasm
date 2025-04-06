@@ -73,11 +73,10 @@ start:
         pop ds
 
         ;; Print floppy info
-        ;; call new_line
-        ;; mov cx, 11
-        ;; mov si, TARGET_FILE
-        ;; call print_N_string
-        ;; call new_line
+        mov cx, 11
+        mov si, TARGET_FILE
+        call print_N_string
+        call new_line
 
         ;; Calculate how many sectors are used by the FATs so we know
         ;; which sector the root directory entry starts on
@@ -116,26 +115,39 @@ start:
         or ax, ax
         jz .err
 
-        ;; set up the other args to load the file just after the boot
-        ;; sector
+        ;; set up the other args to load the file to the boot sector
         push word 07c0h
         pop es
         xor bx, bx
         call RELOCATION_SEGMENT:load_file
 
-        push 07c0h
-        pop ds
-        jmp 0x7c0:0
+        ;; set the necessary registers and jump to it
+        push 07c0h              ; Set DS to match read location
+        pop ds                  ;
+        jmp 07c0h:0             ; Far jump to loaded binary
+
+        ;; if something goes wrong here, we can drop back to the BIOS
+        jmp .hang
 
         .err:
         mov si, ERR_FNF
-        mov cx, 7
+        mov cx, 9
         call print_N_string
 
         .hang:
-        cli
-        hlt
+        int 18h                 ; On a modern BIOS, informs the BIOS
+                                ; that loading failed and to try
+                                ; loading from the next boot device.
         jmp .hang               ; Jump here indefinitely. Will hang the system.
+
+;;; subroutine to go to the next line and carriage return
+;;; Clobbers:
+;;; - CX
+;;; - SI
+new_line:
+        mov cx, 2
+        mov si, NEWLINE_STRING
+        ;; implicitly calls print_N_string
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
 ;;; print in CX, and put a pointer to the string in SI. CX = 0 is
@@ -149,14 +161,6 @@ print_N_string:
         loop .loop
 
         .done:
-        ret
-
-;;; subroutine to go to the next line and carriage return
-new_line:
-        mov ax, 0e0dh           ; carriage return
-        int 10h
-        mov al, 0ah             ; new line
-        int 10h
         ret
 
 ;;; subroutine to load a single 512-byte chunk of the root directory
@@ -500,11 +504,12 @@ footer:
         root_dir_sector dw 0
         cluster_2_sector dw 0
         loaded_FAT_chunk dw 0xFFFF
-        TARGET_FILE db 'TEST'
+        TARGET_FILE db BOOT_FN
         times (TARGET_FILE+8)-$ db ' '
-        db 'BIN'
+        db BOOT_EXT
 
         ERR_FNF db 'MISSING'
+        NEWLINE_STRING db 10, 13
 
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

@@ -116,23 +116,18 @@ start:
         or ax, ax
         jz .err
 
-        ;; set up the other args to load the file just after the boot
-        ;; sector
+        ;; set up the other args to load the file to the boot sector
         push word 07c0h
         pop es
         xor bx, bx
         call load_file
 
-        push 07c0h
-        pop ds
-        mov cx, 13
-        xor si, si
-        call print_N_string
-        push word 07e0h
-        pop ds
-        mov cx, 13
-        xor si, si
-        call print_N_string
+        ;; set the necessary registers and jump to it
+        push 07c0h              ; Set DS to match read location
+        pop ds                  ;
+        jmp 07c0h:0             ; Far jump to loaded binary
+
+        ;; if something goes wrong here, we can drop back to the BIOS
         jmp .hang
 
         .err:

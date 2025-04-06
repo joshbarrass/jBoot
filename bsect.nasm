@@ -141,6 +141,15 @@ start:
                                 ; loading from the next boot device.
         jmp .hang               ; Jump here indefinitely. Will hang the system.
 
+;;; subroutine to go to the next line and carriage return
+;;; Clobbers:
+;;; - CX
+;;; - SI
+new_line:
+        mov cx, 2
+        mov si, NEWLINE_STRING
+        ;; implicitly calls print_N_string
+
 ;;; Subroutine to print an N-byte string. Put a number of bytes to
 ;;; print in CX, and put a pointer to the string in SI. CX = 0 is
 ;;; equivalent to N = 256.
@@ -153,14 +162,6 @@ print_N_string:
         loop .loop
 
         .done:
-        ret
-
-;;; subroutine to go to the next line and carriage return
-new_line:
-        mov ax, 0e0dh           ; carriage return
-        int 10h
-        mov al, 0ah             ; new line
-        int 10h
         ret
 
 ;;; subroutine to load a single 512-byte chunk of the root directory
@@ -508,7 +509,8 @@ footer:
         times (TARGET_FILE+8)-$ db ' '
         db 'TXT'
 
-        ERR_FNF db 'MISSING', 10, 13
+        ERR_FNF db 'MISSING'
+        NEWLINE_STRING db 10, 13
 
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

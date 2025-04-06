@@ -504,9 +504,9 @@ footer:
         root_dir_sector dw 0
         cluster_2_sector dw 0
         loaded_FAT_chunk dw 0xFFFF
-        TARGET_FILE db 'TEST2'
+        TARGET_FILE db BOOT_FN
         times (TARGET_FILE+8)-$ db ' '
-        db 'TXT'
+        db BOOT_EXT
 
         ERR_FNF db 'MISSING'
         NEWLINE_STRING db 10, 13

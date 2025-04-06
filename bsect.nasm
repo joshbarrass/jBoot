@@ -507,6 +507,7 @@ footer:
         TARGET_FILE db BOOT_FN
         times (TARGET_FILE+8)-$ db ' '
         db BOOT_EXT
+        times (TARGET_FILE+11)-$ db ' '
 
         ERR_FNF db 'MISSING'
         NEWLINE_STRING db 10, 13

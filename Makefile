@@ -1,4 +1,4 @@
-bsect.bin: bsect.nasm
+bsect.bin bsect.lst: bsect.nasm
 	nasm -f bin -o bsect.bin -l bsect.lst bsect.nasm
 	./tools/count_free_space.sh bsect.bin
 
@@ -8,6 +8,9 @@ boot.img: bsect.bin ./misc/TEST.TXT ./misc/TEST2.TXT
 	dd if=bsect.bin of=boot.img conv=notrunc
 	mcopy -i boot.img ./misc/TEST.TXT ::TEST.TXT
 	mcopy -i boot.img ./misc/TEST2.TXT ::TEST2.TXT
+
+bsect.h: bsect.bin bsect.lst ./tools/gen_bsect_h.sh
+	./tools/gen_bsect_h.sh
 
 .PHONY: test
 test: boot.img

@@ -109,7 +109,7 @@ start:
 
         ;; Find the first cluster of the file
         mov si, TARGET_FILE
-        call get_cluster_of_file
+        call RELOCATION_SEGMENT:get_cluster_of_file
         ;; AX now contains the cluster number
         ;; if it's zero, then the file doesn't exist
         or ax, ax
@@ -119,7 +119,7 @@ start:
         push word 07c0h
         pop es
         xor bx, bx
-        call load_file
+        call RELOCATION_SEGMENT:load_file
 
         ;; set the necessary registers and jump to it
         push 07c0h              ; Set DS to match read location
@@ -329,7 +329,7 @@ load_file:
         jne load_file
         
         .done:
-        ret
+        retf
 
 ;;; Subroutine to read the entry in the FAT corresponding to a cluster.
 ;;; Args:
@@ -497,7 +497,7 @@ get_cluster_of_file:
 
         .return:
         pop es
-        ret
+        retf
 
 footer:
         boot_drive db 0

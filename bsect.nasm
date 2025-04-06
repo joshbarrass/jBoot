@@ -141,8 +141,9 @@ start:
         call print_N_string
 
         .hang:
-        cli
-        hlt
+        int 18h                 ; On a modern BIOS, informs the BIOS
+                                ; that loading failed and to try
+                                ; loading from the next boot device.
         jmp .hang               ; Jump here indefinitely. Will hang the system.
 
 ;;; Subroutine to print an N-byte string. Put a number of bytes to

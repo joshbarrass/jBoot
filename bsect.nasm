@@ -73,11 +73,10 @@ start:
         pop ds
 
         ;; Print floppy info
-        ;; call new_line
-        ;; mov cx, 11
-        ;; mov si, TARGET_FILE
-        ;; call print_N_string
-        ;; call new_line
+        mov cx, 11
+        mov si, TARGET_FILE
+        call print_N_string
+        call new_line
 
         ;; Calculate how many sectors are used by the FATs so we know
         ;; which sector the root directory entry starts on

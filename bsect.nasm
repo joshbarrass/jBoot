@@ -110,7 +110,7 @@ start:
 
         ;; Find the first cluster of the file
         mov si, TARGET_FILE
-        call get_cluster_of_file
+        call RELOCATION_SEGMENT:get_cluster_of_file
         ;; AX now contains the cluster number
         ;; if it's zero, then the file doesn't exist
         or ax, ax
@@ -121,19 +121,11 @@ start:
         push word 07c0h
         pop es
         xor bx, bx
-        call load_file
+        call RELOCATION_SEGMENT:load_file
 
         push 07c0h
         pop ds
-        mov cx, 13
-        xor si, si
-        call print_N_string
-        push word 07e0h
-        pop ds
-        mov cx, 13
-        xor si, si
-        call print_N_string
-        jmp .hang
+        jmp 0x7c0:0
 
         .err:
         mov si, ERR_FNF
@@ -333,7 +325,7 @@ load_file:
         jne load_file
         
         .done:
-        ret
+        retf
 
 ;;; Subroutine to read the entry in the FAT corresponding to a cluster.
 ;;; Args:
@@ -501,16 +493,16 @@ get_cluster_of_file:
 
         .return:
         pop es
-        ret
+        retf
 
 footer:
         boot_drive db 0
         root_dir_sector dw 0
         cluster_2_sector dw 0
         loaded_FAT_chunk dw 0xFFFF
-        TARGET_FILE db 'TEST2'
+        TARGET_FILE db 'TEST'
         times (TARGET_FILE+8)-$ db ' '
-        db 'TXT'
+        db 'BIN'
 
         ERR_FNF db 'MISSING'
 

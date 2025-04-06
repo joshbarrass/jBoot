@@ -132,7 +132,7 @@ start:
 
         .err:
         mov si, ERR_FNF
-        mov cx, 7
+        mov cx, 9
         call print_N_string
 
         .hang:
@@ -508,7 +508,7 @@ footer:
         times (TARGET_FILE+8)-$ db ' '
         db 'TXT'
 
-        ERR_FNF db 'MISSING'
+        ERR_FNF db 'MISSING', 10, 13
 
         times 510-($-$$) db 0   ; Pad remainder of boot sector with 0s
         dw 0xAA55               ; The standard PC boot signature

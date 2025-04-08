@@ -1,4 +1,5 @@
         BITS 16
+        ORG 0xB00
 
 ;;; We'll use the space from 0x7600 to 0x7BFF as working space for the
 ;;; FAT and root directory listing.
@@ -81,11 +82,12 @@ start:
         .relocation_loop:
         movsw
         loop .relocation_loop
-        jmp RELOCATION_SEGMENT:(.after_relocation)
+        jmp 0:(.after_relocation)
 
         .after_relocation:
-        push word RELOCATION_SEGMENT
-        pop ds
+        mov ax, 0
+        mov ds, ax
+        mov es, ax
 
         ;; Print floppy info
         mov cx, 11
@@ -124,7 +126,7 @@ start:
 
         ;; Find the first cluster of the file
         mov si, TARGET_FILE
-        call RELOCATION_SEGMENT:get_cluster_of_file
+        call 0:get_cluster_of_file
         ;; AX now contains the cluster number
         ;; if it's zero, then the file doesn't exist
         or ax, ax
@@ -134,7 +136,7 @@ start:
         push word 07c0h
         pop es
         xor bx, bx
-        call RELOCATION_SEGMENT:load_file
+        call 0:load_file
 
         ;; set the necessary registers and jump to it
         push 0h              ; Set DS to match read location

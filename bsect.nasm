@@ -1,6 +1,6 @@
         BITS 16
-        ORG 0xB00
-
+        RELOCATION_OFFSET equ 0xB00
+        ORG RELOCATION_OFFSET
 ;;; We'll use the space from 0x7600 to 0x7BFF as working space for the
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
@@ -8,8 +8,6 @@
         FAT_SEGMENT equ 50h
         FAT_OFFSET equ 0
         ROOT_DIR_OFFSET equ 400h
-
-        RELOCATION_SEGMENT equ 0xB0
 
 FAT_header:
         jmp short start
@@ -66,18 +64,16 @@ start:
                                 ; BIOS initially stores this in DL,
                                 ; but we might overwrite this.
 
-        ;; Set DS to where the bootloader is currently loaded
-        push word 7C0h
-        pop ds
+        mov ax, 0
+        mov ds, ax
+        mov es, ax
 
         ;; copy this sector to the target location
         ;; we will read 255 words (510 bytes), which is exactly enough
         ;; to relocate all code, since the BIOS boot signature is 2
         ;; bytes
-        xor si, si
-        xor di, di
-        push word RELOCATION_SEGMENT
-        pop es
+        mov si, 7c00h
+        mov di, RELOCATION_OFFSET
         mov cx, 255
         .relocation_loop:
         movsw
@@ -85,10 +81,6 @@ start:
         jmp 0:(.after_relocation)
 
         .after_relocation:
-        mov ax, 0
-        mov ds, ax
-        mov es, ax
-
         ;; Print floppy info
         mov cx, 11
         mov si, TARGET_FILE

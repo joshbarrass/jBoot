@@ -1,7 +1,7 @@
         BITS 16
         RELOCATION_OFFSET equ 0xB00
         ORG RELOCATION_OFFSET
-;;; We'll use the space from 0x7600 to 0x7BFF as working space for the
+;;; We'll use the space from 0x0500 to 0x0AFF as working space for the
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
 ;;; 0x0500 to 0x7BFF should be free
@@ -33,13 +33,13 @@ FAT_header:
         SYSTEM_ID db 'FAT12   '
 
 start:
-        ;; By pure bad luck, the perfect storm arises in this
-        ;; bootloader to convince the Linux kernel that this partition
-        ;; is something else. If you mount it with mount -t vfat, this
-        ;; isn't an issue, but if you want to mount the image with
-        ;; udisksctl, you'll have nothing but trouble. Adding this NOP
-        ;; is enough to disrupt that and allow Linux to automatically
-        ;; detect it as a FAT12 superfloppy.
+        ;; For some reason, the Linux kernel is convinced that this
+        ;; partition is something else. If you mount it with mount -t
+        ;; vfat, this isn't an issue, but if you want to mount the
+        ;; image with udisksctl, you'll have nothing but
+        ;; trouble. Adding this NOP is enough to disrupt that and
+        ;; allow Linux to automatically detect it as a FAT12
+        ;; superfloppy.
         ;;
         ;; This doesn't affect tools that specifically work with FAT
         ;; filesystems, such as mcopy, so scripted modifications of
@@ -64,6 +64,8 @@ start:
                                 ; BIOS initially stores this in DL,
                                 ; but we might overwrite this.
 
+        ;; Ensure the segmentation registers are clear, so we can
+        ;; access memory linearly
         mov ax, 0
         mov ds, ax
         mov es, ax
@@ -410,6 +412,7 @@ read_FAT_for_cluster:
 ;;; Clobbers:
 ;;;  - CX
 ;;;  - BX
+;;;  - ES -> FAT_SEGMENT = 0
 get_cluster_of_file:
         ;; we need to loop through the 32-byte entries until we find
         ;; the one with the right filename

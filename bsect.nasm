@@ -5,6 +5,7 @@
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
 ;;; 0x0500 to 0x7BFF should be free
+        FAT_SEGMENT equ 0
         FAT_OFFSET equ 500h
         ROOT_DIR_OFFSET equ 900h
 
@@ -205,6 +206,8 @@ load_FAT_chunk:
         ;; configure parameters that stay the same for both the FAT
         ;; and root directory entry loads
         .all_loads:
+        push word FAT_SEGMENT
+        pop es
         mov dl, [boot_drive]
 
         ;; Because of where we've placed the routine, the call is

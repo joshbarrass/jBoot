@@ -137,9 +137,9 @@ start:
         call RELOCATION_SEGMENT:load_file
 
         ;; set the necessary registers and jump to it
-        push 07c0h              ; Set DS to match read location
+        push 0h              ; Set DS to match read location
         pop ds                  ;
-        jmp 07c0h:0             ; Far jump to loaded binary
+        jmp 0:7c00h             ; Far jump to loaded binary
 
         ;; if something goes wrong here, we can drop back to the BIOS
         jmp .hang

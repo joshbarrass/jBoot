@@ -5,9 +5,9 @@
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
 ;;; 0x0500 to 0x7BFF should be free
-        FAT_SEGMENT equ 50h
-        FAT_OFFSET equ 0
-        ROOT_DIR_OFFSET equ 400h
+        FAT_SEGMENT equ 0
+        FAT_OFFSET equ 500h
+        ROOT_DIR_OFFSET equ 900h
 
 FAT_header:
         jmp short start
@@ -385,7 +385,7 @@ read_FAT_for_cluster:
         push ds                 ; We need to set the data segment to do (ds:)bx properly
         push word FAT_SEGMENT   ;
         pop ds                  ;
-        mov bx, [bx]
+        mov bx, [bx+FAT_OFFSET]
         pop ds                  ; Restore the old DS
 
         ;; BX now contains the word corresponding to the FAT

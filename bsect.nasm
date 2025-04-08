@@ -5,7 +5,6 @@
 ;;; FAT and root directory listing.
 ;;; https://wiki.osdev.org/Memory_Map_(x86)#Overview
 ;;; 0x0500 to 0x7BFF should be free
-        FAT_SEGMENT equ 0
         FAT_OFFSET equ 500h
         ROOT_DIR_OFFSET equ 900h
 
@@ -125,14 +124,10 @@ start:
         jz .err
 
         ;; set up the other args to load the file to the boot sector
-        push word 07c0h
-        pop es
-        xor bx, bx
+        mov bx, 7c00h
         call 0:load_file
 
         ;; set the necessary registers and jump to it
-        push 0h              ; Set DS to match read location
-        pop ds                  ;
         jmp 0:7c00h             ; Far jump to loaded binary
 
         ;; if something goes wrong here, we can drop back to the BIOS
@@ -210,8 +205,6 @@ load_FAT_chunk:
         ;; configure parameters that stay the same for both the FAT
         ;; and root directory entry loads
         .all_loads:
-        push word FAT_SEGMENT         ; Store just before the boot sector
-        pop es                        ;
         mov dl, [boot_drive]
 
         ;; Because of where we've placed the routine, the call is
@@ -382,11 +375,7 @@ read_FAT_for_cluster:
         pop dx
         pop ax                  ; restore AX from earlier for the comparison we need
 
-        push ds                 ; We need to set the data segment to do (ds:)bx properly
-        push word FAT_SEGMENT   ;
-        pop ds                  ;
         mov bx, [bx+FAT_OFFSET]
-        pop ds                  ; Restore the old DS
 
         ;; BX now contains the word corresponding to the FAT
         ;; entry. For FAT12, this will contain the FAT entry we want +
@@ -419,17 +408,8 @@ read_FAT_for_cluster:
 ;;;  - CX
 ;;;  - BX
 get_cluster_of_file:
-        push es
-
-        ;; Set the segment.
-        ;; ES needs to point us to the right segment for the root
-        ;; directory entry.
-        ;; DS stays as it is as we're comparing DS:SI against ES:DI
-        push word FAT_SEGMENT
-        pop es
-
-        ;; now we need to loop through the 32-byte entries until we
-        ;; find the one with the right filename
+        ;; we need to loop through the 32-byte entries until we find
+        ;; the one with the right filename
 
         ;; calculate how many sectors are used by the root directory
         ;; entries.
@@ -505,7 +485,6 @@ get_cluster_of_file:
                                 ; which we've been using ES for.
 
         .return:
-        pop es
         retf
 
 footer:
